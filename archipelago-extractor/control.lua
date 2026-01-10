@@ -78,7 +78,9 @@ function dumpResourceInfo()
     data_collection = {}
     for _, proto in pairs(prototypes.autoplace_control) do
         if proto.category == "resource" then
+            log(proto.name)
             local r_proto = prototypes.entity[proto.name]
+            if r_proto == nil then log("uh oh") for k, v in pairs(prototypes.entity) do log(k) end end
             local minable = r_proto.mineable_properties
             local resource = {}
             resource["minable"] = minable.minable
@@ -156,6 +158,55 @@ function dumpGameInfo()
     dumpFluidInfo()
 end
 
+-- see: https://lua-api.factorio.com/latest/index-runtime.html
+local userdata_keys = {
+    LuaForce = {
+        "technologies",
+        "recipes",
+    }
+}
+
+function to_json_compatible(x)
+    local t = type(x)
+    if t == "number" or t == "string" or t == "boolean" then
+        return x
+    end
+    if t == "userdata" then
+        log("so far this is userdata: " .. tostring(x))
+        if tostring(x) == "[LuaCustomTable]" then
+            log("that's a table")
+            t = "table"
+        end
+    end
+    if t == "table" then
+        local r = {}
+        for k, v in pairs(x) do
+            r[k] = to_json_compatible(v)
+        end
+        return r
+    end
+
+    -- userdata is a host-provided type that Lua cannot do reflection on.
+    if t ~= "userdata" then log("new Lua type just dropped?") log(x) return nil end
+    -- Example: "[LuaForce: player]" -> "LuaForce"
+    _, _, t = string.find(tostring(x), "^%[(%a+): ")
+    if t == nil then log("what's this tostring format?") log(x) return nil end
+
+    local keys = userdata_keys[t]
+    if keys == nil then log("need handler for: " .. t) return nil end
+
+    local r = {}
+    for _, k in pairs(keys) do
+        r[k] = to_json_compatible(x[k])
+    end
+    return r
+end
+
 commands.add_command("ap-get-info-dump", "Dump Game Info, used by Archipelago.", function(call)
-    dumpGameInfo()
+    local data_collection = {}
+    data_collection["force"] = to_json_compatible(game.forces["player"])
+    data_collection["prototypes"] = to_json_compatible(prototypes)
+    helpers.write_file("all.json", helpers.table_to_json(data_collection), false)
+    game.print("Exported All Data")
+    log("Exported All Data")
 end)
