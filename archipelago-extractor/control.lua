@@ -158,26 +158,75 @@ function dumpGameInfo()
     dumpFluidInfo()
 end
 
--- see: https://lua-api.factorio.com/latest/index-runtime.html
+-- These are the keys that we care about exporting from each type.
+-- See: https://lua-api.factorio.com/latest/index-runtime.html
 local userdata_keys = {
     LuaForce = {
         "technologies",
         "recipes",
-    }
+    },
+    LuaTechnology = {
+        "prototype",
+    },
+    LuaTechnologyPrototype = {
+        -- "enabled", -- they're all enabled
+        "upgrade",
+        "research_unit_ingredients",
+        "effects",
+        "research_unit_count",
+        "research_unit_energy",
+        "level",
+        "max_level",
+        "research_unit_count_formula",
+        "research_trigger",
+        -- "allows_productivity", -- they all allow productivity
+    },
+    LuaRecipe = {
+        "enabled",
+        "category",
+        "additional_categories",
+        "ingredients",
+        "products",
+        "hidden",
+        -- "hidden_from_flow_stats", -- none of them are
+        "energy",
+        "group",
+        "subgroup",
+        -- "productivity_bonus", -- always 0
+    },
+    LuaGroup = {
+        "name",
+    },
+    LuaPrototypes = {
+        "entity",
+        "autoplace_control",
+        "item",
+        "fluid",
+    },
+    -- LuaEntityPrototype
+    -- LuaAutoplaceControlPrototype
+    -- LuaItemPrototype
+    -- LuaFluidPrototype
 }
+
+local reported_missing_already = {}
 
 function to_json_compatible(x)
     local t = type(x)
-    if t == "number" or t == "string" or t == "boolean" then
+    if t == "number" or t == "string" or t == "boolean" or t == "nil" then
         return x
     end
+
+    -- userdata is a host-provided type that Lua cannot do reflection on,
+    -- but the Factorio provides various means for us that we must use correctly.
     if t == "userdata" then
-        log("so far this is userdata: " .. tostring(x))
-        if tostring(x) == "[LuaCustomTable]" then
-            log("that's a table")
+        t = x.object_name
+        if t == "LuaCustomTable" then
+            -- This is an optimized type that acts like a Lua table for our purposes.
             t = "table"
         end
     end
+
     if t == "table" then
         local r = {}
         for k, v in pairs(x) do
@@ -186,14 +235,14 @@ function to_json_compatible(x)
         return r
     end
 
-    -- userdata is a host-provided type that Lua cannot do reflection on.
-    if t ~= "userdata" then log("new Lua type just dropped?") log(x) return nil end
-    -- Example: "[LuaForce: player]" -> "LuaForce"
-    _, _, t = string.find(tostring(x), "^%[(%a+): ")
-    if t == nil then log("what's this tostring format?") log(x) return nil end
-
     local keys = userdata_keys[t]
-    if keys == nil then log("need handler for: " .. t) return nil end
+    if keys == nil then
+        if reported_missing_already[t] == nil then
+            log("need handler for: " .. t)
+            reported_missing_already[t] = true
+        end
+        return nil
+    end
 
     local r = {}
     for _, k in pairs(keys) do
