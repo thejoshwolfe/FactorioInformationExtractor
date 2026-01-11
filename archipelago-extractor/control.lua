@@ -1,175 +1,22 @@
-function dumpTechInfo(force)
-    local data_collection = {}
-
-    for tech_name, tech in pairs(force.technologies) do
-        if tech.enabled then
-            local tech_data = {}
-            local unlocks = {}
-            tech_data["unlocks"] = unlocks
-            local requires = {}
-            tech_data["requires"] = requires
-            tech_data["infinite"] = tech.prototype.max_level == 4294967295
-            local modifiers =  {}
-            for tech_requirement, _ in pairs(tech.prerequisites) do
-                table.insert(requires, tech_requirement)
-            end
-            for _, modifier in pairs(tech.prototype.effects) do
-                if modifier.type == "unlock-recipe" then
-                    table.insert(unlocks, modifier.recipe)
-                else
-                    table.insert(modifiers, modifier.type)
-                end
-            end
-            if #modifiers > 0 then
-                tech_data["modifiers"] = modifiers
-            end
-            data_collection[tech_name] = tech_data
-            tech.researched = true -- enable all available recipes
-        end
-    end
-    helpers.write_file("techs.json", helpers.table_to_json(data_collection), false)
-    game.print("Exported Tech Data")
-end
-
-function dumpRecipeInfo(force)
-    data_collection = {}
-    for recipe_name, recipe in pairs(force.recipes) do
-        if recipe.enabled then
-            local recipe_data = {}
-            recipe_data["ingredients"] = {}
-            recipe_data["products"] = {}
-            recipe_data["category"] = recipe.category
-            recipe_data["energy"] = recipe.energy
-            for _, ingredient in pairs(recipe.ingredients) do
-                recipe_data["ingredients"][ingredient.name] = ingredient.amount
-            end
-            for _, product in pairs(recipe.products) do
-                recipe_data["products"][product.name] = product.amount
-            end
-            data_collection[recipe_name] = recipe_data
-        end
-    end
-    helpers.write_file("recipes.json", helpers.table_to_json(data_collection), false)
-    game.print("Exported Recipe Data")
-end
-
-function dumpMachineInfo()
-    data_collection = {}
-    for _, proto in pairs(prototypes.entity) do
-        if proto.crafting_categories or proto.resource_categories then
-            data_collection[proto.name] = {}
-            if proto.crafting_categories then
-                data_collection[proto.name]["crafting"] = {}
-                data_collection[proto.name]["crafting"]["speed"] = proto.crafting_speed
-                data_collection[proto.name]["crafting"]["categories"] = proto.crafting_categories
-            end
-            if proto.resource_categories then
-                data_collection[proto.name]["mining"] = {}
-                data_collection[proto.name]["mining"]["categories"] = proto.resource_categories
-                data_collection[proto.name]["mining"]["speed"] = proto.mining_speed
-            end
-        end
-    end
-    helpers.write_file("machines.json", helpers.table_to_json(data_collection), false)
-    game.print("Exported Machine Data")
-end
-
-function dumpResourceInfo()
-    data_collection = {}
-    for _, proto in pairs(prototypes.autoplace_control) do
-        if proto.category == "resource" then
-            log(proto.name)
-            local r_proto = prototypes.entity[proto.name]
-            if r_proto == nil then log("uh oh") for k, v in pairs(prototypes.entity) do log(k) end end
-            local minable = r_proto.mineable_properties
-            local resource = {}
-            resource["minable"] = minable.minable
-            resource["infinite"] = r_proto.infinite_resource
-            if r_proto.infinite_resource then
-                resource["infinite_depletion"] = r_proto.infinite_depletion_resource_amount
-            end
-            resource["category"] = r_proto.resource_category
-            resource["mining_time"] = minable.mining_time
-            resource["required_fluid"] = minable.required_fluid
-            resource["fluid_amount"] = minable.fluid_amount
-            resource["products"] = {}
-            for _, product in pairs(minable.products) do
-                resource["products"][product.name] = {}
-                -- resource["products"][product.name]["type"] = product.type
-                resource["products"][product.name]["name"] = product.name
-                if product.amount then
-                    resource["products"][product.name]["amount"] = product.amount
-                else
-                    resource["products"][product.name]["amount"] = product.probability * (product.amount_min+product.amount_max)/2
-                end
-                resource["products"][product.name]["catalyst_amount"] = product.catalyst_amount
-                -- hopefully don't need this
-                -- if product.type == "fluid" then
-                --     resource["products"][product.name]["temperature"] = product.temperature
-                -- end
-            end
-            data_collection[proto.name] = resource
-        end
-    end
-    helpers.write_file("resources.json", helpers.table_to_json(data_collection), false)
-    game.print("Exported Minable Resource Data")
-end
-
-function dumpMachineInfo()
-    data_collection = {}
-    for _, proto in pairs(prototypes.entity) do
-        if proto.crafting_categories then
-            data_collection[proto.name] = proto.crafting_categories
-        end
-    end
-
-    helpers.write_file("machines.json", helpers.table_to_json(data_collection), false)
-    game.print("Exported Machine Data")
-end
-
-function dumpItemInfo()
-    data_collection = {}
-    for _, item in pairs(prototypes.item) do
-        data_collection[item.name] = item.stack_size
-    end
-
-    helpers.write_file("items.json", helpers.table_to_json(data_collection), false)
-    game.print("Exported Item Data")
-end
-
-function dumpFluidInfo()
-    data_collection = {}
-    for _, item in pairs(prototypes.fluid) do
-        table.insert(data_collection, item.name)
-    end
-
-    helpers.write_file("fluids.json", helpers.table_to_json(data_collection), false)
-    game.print("Exported Fluid Data")
-end
-
-function dumpGameInfo()
-    -- dump Game Information that the Archipelago Randomizer needs.
-    local force = game.forces["player"]
-    dumpTechInfo(force)
-    dumpRecipeInfo(force)
-    dumpResourceInfo()
-    dumpMachineInfo()
-    dumpItemInfo()
-    dumpFluidInfo()
-end
-
 -- These are the keys that we care about exporting from each type.
 -- See: https://lua-api.factorio.com/latest/index-runtime.html
 local userdata_keys = {
-    LuaForce = {
-        "technologies",
-        "recipes",
+    LuaPrototypes = {
+        -- stuff
+        "entity",
+        "item",
+        "fluid",
+        "tile",
+        -- making things
+        "technology",
+        "recipe",
+        -- places
+        "space_location",
+        "space_connection",
     },
-    LuaTechnology = {
-        "prototype",
-    },
+
     LuaTechnologyPrototype = {
-        -- "enabled", -- they're all enabled
+        "enabled", -- always true
         "upgrade",
         "research_unit_ingredients",
         "effects",
@@ -179,39 +26,204 @@ local userdata_keys = {
         "max_level",
         "research_unit_count_formula",
         "research_trigger",
-        -- "allows_productivity", -- they all allow productivity
+        -- "allows_productivity", -- always true
+        "*prerequisites",
     },
-    LuaRecipe = {
-        "enabled",
-        "category",
+    LuaRecipePrototype = {
+        "enabled", -- true for starter recipes and many hidden recipes, such as assembling-machine-1-recycling
+        "unlock_results", -- usually true. false for unbarreling and non-scrap recycling.
+        "hidden_from_player_crafting", -- true for non-scrap recycling, barreling/unbarreling, and fixed_recipe recipes (e.g. rocket-part)
+        "category", -- matched against a crafting machine's .crafting_categories
         "additional_categories",
-        "ingredients",
-        "products",
-        "hidden",
-        -- "hidden_from_flow_stats", -- none of them are
+        "hidden_from_flow_stats",
         "energy",
         "group",
         "subgroup",
-        -- "productivity_bonus", -- always 0
+        "request_paste_multiplier", -- e.g. 1, 10, or 30
+        -- "overload_multiplier", -- always 0
+        -- "maximum_productivity", -- always 3
+        -- "allowed_module_categories", -- always omitted
+        -- "result_is_always_fresh", -- always false
+        -- "trash", -- always empty
+        "preserve_products_in_machine_output", -- true only for biter eggs from bioflux
+        "surface_conditions",
+        "allowed_effects", -- the .productivity and .quality properties are interesting
+        "reset_freshness_on_craft", -- true for some breeding recipes
+        "ingredients",
+        "products",
     },
-    LuaGroup = {
-        "name",
+
+    LuaEntityPrototype = {
+        -- resources, buildings, ...
+        "mineable_properties",
+        "items_to_place_this", -- if non-empty, always "count":1, except for curved rail entities
+        "flags",
+
+        -- resources
+        "resource_category", -- it is this category.
+        "minimum_resource_amount",
+        "normal_resource_amount",
+        "infinite_resource",
+        "infinite_depletion_resource_amount",
+        "autoplace_specification", -- used by world gen
+        "loot", -- only used by egg rafts to drop pentapog eggs
+
+        -- buildings in general
+        "is_building",
+        "energy_usage",
+        "surface_conditions",
+        "effect_receiver", -- e.g. .effect_receiver.base_effect.productivty is 0.5 for foundry and such.
+        "burner_prototype",
+        "electric_energy_source_prototype",
+        "heat_energy_source_prototype",
+        "fluid_energy_source_prototype",
+        "void_energy_source_prototype", -- used by powerless entities that perhaps could be powered, such as offshore pump and spidertron.
+        "heat_buffer_prototype",
+        "heating_energy", -- 0 means never freezes.
+        "tile_buildability_rules", -- "dangle" rules: offshore-pump, asteroid-collector, thruster, rail-ramp.
+
+        -- crafting machines (assembling machine, foundry, silo, etc.)
+        "crafting_categories", -- matched against a recipe's .category
+        "fixed_recipe", -- "biter-egg" for captive biter spawner and "rocket-part" for rocket silo.
+        "module_inventory_size",
+        --"quality_affects_module_slots", -- always false
+        "ingredient_count", -- 1 for furnaces, 65535 for all other crafting machines.
+        "max_item_product_count", -- 1 for furnaces, 12 for recycler, 65535 for all other crafting machines.
+
+        -- labs
+        "lab_inputs", -- all 12 science packs for both labs.
+        "science_pack_drain_rate_percent", -- 100 for lab, 50 for biolab.
+
+        -- miners (burner, electric, big, pumpjack)
+        "resource_categories", -- it mines these categories.
+        "mining_drill_radius",
+        --"quality_affects_mining_radius", -- always false
+        "mining_speed",
+        "resource_drain_rate_percent",
+        "uses_force_mining_productivity_bonus",
+
+        -- agricultural tower (which is *not* a miner)
+        "agricultural_tower_radius", -- 3 for agricultural-tower
+        --"accepted_seeds", -- always empty
+
+        -- power generators and vehicles
+        "effectivity",
+        "consumption", -- vehicles only
+        "grid_prototype", -- equipment grid
+        "perceived_performance", -- used by fusion-reactor
+
+        -- solar panel
+        "solar_panel_performance_at_day", -- 1
+        "solar_panel_performance_at_night", -- 0
+
+        -- thruster
+        "min_performance",
+        "max_performance",
+
+        -- other
+        "time_to_live", -- used by corpses/remnants that despawn over time. (not related to spoilage.) 
+        "cliff_explosive_prototype", -- "cliff-explosives" for the 4 types of cliffs.
+        "*indexed_guns",
     },
-    LuaPrototypes = {
-        "entity",
-        "autoplace_control",
-        "item",
-        "fluid",
+    LuaBurnerPrototype = {
+        "fuel_inventory_size", -- 3 for locomotive, 2 for heating tower, 1 otherwise
+        "burnt_inventory_size", -- 1 for nuclear reactor, 2 for heating tower
+        "fuel_categories", -- matched against an item's .fuel_category
     },
-    -- LuaEntityPrototype
-    -- LuaAutoplaceControlPrototype
-    -- LuaItemPrototype
-    -- LuaFluidPrototype
+
+    LuaItemPrototype = {
+        "flags",
+        "stack_size",
+        "fuel_category", -- matched against a entity's .burner_prototype.fuel_categories
+        "*place_result",
+        "*place_as_equipment_result",
+        "*place_as_tile_result",
+        "*spoil_result",
+        "*plant_result",
+        "*burnt_result",
+
+        "equipment_grid",
+        "provides_flight", -- true only for mech armor
+        "ammo_category", -- if this is ammo, what kind is it?
+        -- TODO: how can we connect rocket-launcher to captive-biter-spawner?
+
+        -- rocket logistics info
+        "weight",
+        "ingredient_to_weight_coefficient",
+        "*default_import_location", -- usually nauvis.
+        "send_to_orbit_mode", -- only "manual" for raw fish (to trigger a legacy achievement). "not-sendable" otherwise.
+        "moved_to_hub_when_building", -- if false, deconstructing a belt of this item in space deletes the items.
+
+        -- blueprint-book
+        --"inventory_size", -- 65535 for blueprint book
+        --"*item_filters",
+        --"item_group_filters",
+        --"item_subgroup_filters",
+        --"filter_mode",
+
+        -- modules
+        "module_effects",
+        "category",
+        "tier",
+        "requires_beacon_alt_mode", -- meaning this module is not allowed in a beacon: productivity and quality modules.
+
+        "infinite", -- false for repair packs and science packs.
+
+        -- space platform starter pack
+        --"trigger", -- only used in space platform starter pack
+        --"surface",
+        "create_electric_network", -- true only for space platform starter pack
+        "*tiles", -- builds space platform foundations around the hub.
+        "initial_items", -- stocks 10 space platform foundations in the hub.
+
+        --"rocket_launch_products", -- always empty
+        --"spoil_to_trigger_result", -- eggs spoiling into enemies. omit large data that probably doesn't matter here.
+        --"destroyed_by_dropping_trigger", -- always empty
+    },
+
+    LuaTilePrototype = {
+        "autoplace_specification",
+        "mineable_properties",
+        "*fluid",
+        "*items_to_place_this",
+        "is_foundation",
+        "allows_being_covered",
+        "destroys_dropped_items", -- probably just lava, right?
+    },
+
+    LuaSpaceLocationPrototype = {
+        "solar_power_in_space",
+        "asteroid_spawn_influence",
+        "asteroid_spawn_definitions",
+        "map_gen_settings",
+        "entities_require_heating",
+        "pollutant_type",
+        "surface_properties",
+    },
+    LuaSpaceConnectionPrototype = {
+        "*from",
+        "*to",
+        "length",
+        "asteroid_spawn_definitions",
+    },
+
+    -- Just the name is useful.
+    LuaGroup = {"name"},
+    LuaAmmoCategoryPrototype = {"name"},
+    LuaAirbornePollutantPrototype = {"name"},
+
+    -- no interesting properties for these:
+    LuaElectricEnergySourcePrototype = {},
+    LuaHeatEnergySourcePrototype = {},
+    LuaHeatBufferPrototype = {},
+    LuaVoidEnergySourcePrototype = {},
+    LuaEquipmentGridPrototype = {},
+    LuaFluidPrototype = {},
 }
 
 local reported_missing_already = {}
 
-function to_json_compatible(x)
+function to_json_compatible(x, only_reference)
     local t = type(x)
     if t == "number" or t == "string" or t == "boolean" or t == "nil" then
         return x
@@ -230,32 +242,45 @@ function to_json_compatible(x)
     if t == "table" then
         local r = {}
         for k, v in pairs(x) do
-            r[k] = to_json_compatible(v)
+            r[k] = to_json_compatible(v, only_reference)
         end
         return r
     end
 
-    local keys = userdata_keys[t]
-    if keys == nil then
-        if reported_missing_already[t] == nil then
-            log("need handler for: " .. t)
-            reported_missing_already[t] = true
+    local keys = nil
+    if only_reference then
+        -- pointer
+        keys = {
+            "object_name",
+            "name",
+        }
+    else
+        keys = userdata_keys[t]
+        if keys == nil then
+            if reported_missing_already[t] == nil then
+                log("need handler for: " .. t)
+                reported_missing_already[t] = true
+            end
+            return "<<<<TODO: " .. t .. ">>>>"
         end
-        return nil
     end
 
     local r = {}
     for _, k in pairs(keys) do
-        r[k] = to_json_compatible(x[k])
+        if string.sub(k, 1, 1) == "*" then
+            -- Do not recursively embed the entire object; just give enough information to be a pointer.
+            k = string.sub(k, 2)
+            r[k] = to_json_compatible(x[k], true)
+        else
+            r[k] = to_json_compatible(x[k], only_reference)
+        end
     end
     return r
 end
 
 commands.add_command("ap-get-info-dump", "Dump Game Info, used by Archipelago.", function(call)
-    local data_collection = {}
-    data_collection["force"] = to_json_compatible(game.forces["player"])
-    data_collection["prototypes"] = to_json_compatible(prototypes)
-    helpers.write_file("all.json", helpers.table_to_json(data_collection), false)
+    local data_collection = to_json_compatible(prototypes, false)
+    helpers.write_file("ap-dump.json", helpers.table_to_json(data_collection), false)
     game.print("Exported All Data")
     log("Exported All Data")
 end)
