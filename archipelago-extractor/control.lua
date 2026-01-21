@@ -17,7 +17,7 @@ local userdata_keys = {
 
     LuaTechnologyPrototype = {
         "enabled", -- always true
-        "upgrade",
+        "upgrade", -- used inconsistently (missing from railgun-damage-1, present on quality-module)
         "research_unit_ingredients",
         "effects",
         "research_unit_count",
@@ -34,7 +34,7 @@ local userdata_keys = {
         "unlock_results", -- usually true. false for unbarreling and non-scrap recycling.
         "hidden_from_player_crafting", -- true for non-scrap recycling, barreling/unbarreling, and fixed_recipe recipes (e.g. rocket-part)
         "category", -- matched against a crafting machine's .crafting_categories
-        "additional_categories",
+        "additional_categories", -- always empty
         "hidden_from_flow_stats",
         "energy",
         "group",
@@ -73,6 +73,7 @@ local userdata_keys = {
         "energy_usage",
         "surface_conditions",
         "effect_receiver", -- e.g. .effect_receiver.base_effect.productivty is 0.5 for foundry and such.
+        "fluid_capacity",
         "burner_prototype",
         "electric_energy_source_prototype",
         "heat_energy_source_prototype",
@@ -93,6 +94,10 @@ local userdata_keys = {
         -- labs
         "lab_inputs", -- all 12 science packs for both labs.
         "science_pack_drain_rate_percent", -- 100 for lab, 50 for biolab.
+
+        -- boilers
+        --"target_temperature", -- handled specially
+        "boiler_mode",
 
         -- miners (burner, electric, big, pumpjack)
         "resource_categories", -- it mines these categories.
@@ -124,11 +129,7 @@ local userdata_keys = {
         "time_to_live", -- used by corpses/remnants that despawn over time. (not related to spoilage.) 
         "cliff_explosive_prototype", -- "cliff-explosives" for the 4 types of cliffs.
         "*indexed_guns",
-    },
-    LuaBurnerPrototype = {
-        "fuel_inventory_size", -- 3 for locomotive, 2 for heating tower, 1 otherwise
-        "burnt_inventory_size", -- 1 for nuclear reactor, 2 for heating tower
-        "fuel_categories", -- matched against an item's .fuel_category
+        "attack_parameters",
     },
 
     LuaItemPrototype = {
@@ -160,6 +161,9 @@ local userdata_keys = {
         --"item_group_filters",
         --"item_subgroup_filters",
         --"filter_mode",
+
+        -- weapons
+        "attack_parameters",
 
         -- modules
         "module_effects",
@@ -207,16 +211,30 @@ local userdata_keys = {
         "asteroid_spawn_definitions",
     },
 
+    LuaHeatEnergySourcePrototype = {
+        "min_working_temperature",
+    },
+    LuaHeatBufferPrototype = {
+        "min_working_temperature",
+    },
+    LuaBurnerPrototype = {
+        "fuel_inventory_size", -- 3 for locomotive, 2 for heating tower, 1 otherwise
+        "burnt_inventory_size", -- 1 for nuclear reactor, 2 for heating tower
+        "fuel_categories", -- matched against an item's .fuel_category
+    },
+    LuaElectricEnergySourcePrototype = {
+        "buffer_capacity",
+        "usage_priority", -- one of: lamp, managed-accumulator, primary-input, primary-output, secondary-input, secondary-output, solar, tertiary.
+        "drain",
+    },
+    LuaVoidEnergySourcePrototype = {},
+
     -- Just the name is useful.
     LuaGroup = {"name"},
     LuaAmmoCategoryPrototype = {"name"},
     LuaAirbornePollutantPrototype = {"name"},
 
     -- no interesting properties for these:
-    LuaElectricEnergySourcePrototype = {},
-    LuaHeatEnergySourcePrototype = {},
-    LuaHeatBufferPrototype = {},
-    LuaVoidEnergySourcePrototype = {},
     LuaEquipmentGridPrototype = {},
     LuaFluidPrototype = {},
 }
@@ -273,6 +291,10 @@ function to_json_compatible(x, only_reference)
             r[k] = to_json_compatible(x[k], true)
         else
             r[k] = to_json_compatible(x[k], only_reference)
+        end
+        if k == "boiler_mode" and x.boiler_mode ~= nil then
+            -- This property *crashes* if we try to read it from a non-boiler.
+            r["target_temperature"] = to_json_compatible(x["target_temperature"], only_reference)
         end
     end
     return r
