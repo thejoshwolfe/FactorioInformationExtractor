@@ -19,6 +19,7 @@ local userdata_keys = {
         "enabled", -- always true
         "upgrade", -- used inconsistently (missing from railgun-damage-1, present on quality-module)
         "research_unit_ingredients",
+        "ignore_tech_cost_multiplier", -- only true for automation (assembling-machine-1 technology)
         "effects",
         "research_unit_count",
         "research_unit_energy",
@@ -146,7 +147,6 @@ local userdata_keys = {
         "equipment_grid",
         "provides_flight", -- true only for mech armor
         "ammo_category", -- if this is ammo, what kind is it?
-        -- TODO: how can we connect rocket-launcher to captive-biter-spawner?
 
         -- rocket logistics info
         "weight",
